@@ -1,0 +1,10 @@
+{
+"SpaProxyServer": {
+"ServerUrl": "https://localhost:60103",
+"RedirectUrl": "",
+"LaunchCommand": "npm run dev",
+"WorkingDirectory": "D:\\AppStore\\app\\app.Server\\..\\app.client",
+"MaxTimeoutInSeconds": "120",
+"KeepRunning": "false"
+}
+}
