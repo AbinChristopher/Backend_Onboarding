@@ -1,8 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using app.Server.Models;
+﻿using app.Server.Models;
+using app.Server.DTOs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System;
 
 namespace app.Server.Controllers
 {
@@ -19,88 +21,179 @@ namespace app.Server.Controllers
 
         // POST: api/Customers
         [HttpPost(Name = "AddCustomer")]
-        public async Task<ActionResult<Customer>> AddCustomer([FromBody] CustomerRequest customerRequest)
+        public async Task<ActionResult<CustomerDTO>> AddCustomer([FromBody] CustomerRequest customerRequest)
         {
-            // 1. Create a new Customer with the provided information
-            var customer = new Customer
+            if (customerRequest == null || string.IsNullOrWhiteSpace(customerRequest.Name) || string.IsNullOrWhiteSpace(customerRequest.Address))
             {
-                Name = customerRequest.Name,
-                Address = customerRequest.Address
-            };
-
-            // 2. Add customer to the database
-            _context.Customers.Add(customer);
-            await _context.SaveChangesAsync(); // Save the customer and generate the Customer ID
-
-            // 3. Return the newly created customer
-            return CreatedAtAction(nameof(GetCustomer), new { id = customer.Id }, customer);
-        }
-
-        // GET: api/Customers/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Customer>> GetCustomer(int id)
-        {
-            var customer = await _context.Customers.FindAsync(id);
-
-            if (customer == null)
-            {
-                return NotFound();
+                return BadRequest("Customer details are required. Please ensure Name and Address are provided.");
             }
 
-            return customer;
+            try
+            {
+                var customer = new Customer
+                {
+                    Name = customerRequest.Name,
+                    Address = customerRequest.Address
+                };
+
+                _context.Customers.Add(customer);
+                await _context.SaveChangesAsync();
+
+                var customerDto = new CustomerDTO
+                {
+                    Id = customer.Id,
+                    Name = customer.Name,
+                    Address = customer.Address
+                };
+
+                return CreatedAtAction(nameof(GetCustomer), new { id = customer.Id }, customerDto);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while adding the customer. Please try again later.");
+            }
+        }
+
+        // GET: api/Customers/{id}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<CustomerDTO>> GetCustomer(int id)
+        {
+            if (id <= 0)
+            {
+                return BadRequest("Invalid customer ID. ID must be greater than zero.");
+            }
+
+            try
+            {
+                var customer = await _context.Customers.FindAsync(id);
+
+                if (customer == null)
+                {
+                    return NotFound();
+                }
+
+                var customerDto = new CustomerDTO
+                {
+                    Id = customer.Id,
+                    Name = customer.Name,
+                    Address = customer.Address
+                };
+
+                return customerDto;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the customer.");
+            }
         }
 
         // GET: api/Customers
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
+        public async Task<ActionResult<IEnumerable<CustomerDTO>>> GetCustomers()
         {
-            return await _context.Customers.ToListAsync();
+            try
+            {
+                var customers = await _context.Customers.ToListAsync();
+
+                var customerDtos = new List<CustomerDTO>();
+                foreach (var customer in customers)
+                {
+                    customerDtos.Add(new CustomerDTO
+                    {
+                        Id = customer.Id,
+                        Name = customer.Name,
+                        Address = customer.Address
+                    });
+                }
+
+                return customerDtos;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while retrieving the customers list.");
+            }
         }
 
-        // PUT: api/Customers/5
+        // GET: api/Customers/count
+        [HttpGet("count")]
+        public async Task<ActionResult<object>> GetCustomerCount()
+        {
+            try
+            {
+                var count = await _context.Customers.CountAsync();
+                return Ok(new { count });
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while counting customers.");
+            }
+        }
+
+        // PUT: api/Customers/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateCustomer(int id, [FromBody] CustomerRequest customerRequest)
         {
-            // Check if the customer exists
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("Invalid customer ID. ID must be greater than zero.");
             }
 
-            // Update customer fields
-            customer.Name = customerRequest.Name;
-            customer.Address = customerRequest.Address;
+            if (customerRequest == null || string.IsNullOrWhiteSpace(customerRequest.Name) || string.IsNullOrWhiteSpace(customerRequest.Address))
+            {
+                return BadRequest("Customer details are required for update. Please ensure Name and Address are provided.");
+            }
 
-            // Save the changes to the database
-            _context.Entry(customer).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            try
+            {
+                var customer = await _context.Customers.FindAsync(id);
+                if (customer == null)
+                {
+                    return NotFound();
+                }
 
-            // Return a success response
-            return NoContent();
+                customer.Name = customerRequest.Name;
+                customer.Address = customerRequest.Address;
+
+                _context.Entry(customer).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while updating the customer.");
+            }
         }
 
-        // DELETE: api/Customers/5
+        // DELETE: api/Customers/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCustomer(int id)
         {
-            // Find the customer to delete
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("Invalid customer ID. ID must be greater than zero.");
             }
 
-            // Remove the customer from the database
-            _context.Customers.Remove(customer);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var customer = await _context.Customers.FindAsync(id);
+                if (customer == null)
+                {
+                    return NotFound();
+                }
 
-            // Return a success response
-            return NoContent();
+                _context.Customers.Remove(customer);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while deleting the customer.");
+            }
         }
     }
 
-    // Request body for adding or updating a customer
     public class CustomerRequest
     {
         public string Name { get; set; }

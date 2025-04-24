@@ -3,6 +3,8 @@ using app.Server.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Linq;
+using app.Server.DTOs;
 
 namespace app.Server.Controllers
 {
@@ -19,78 +21,175 @@ namespace app.Server.Controllers
 
         // POST: api/Products
         [HttpPost(Name = "AddProduct")]
-        public async Task<ActionResult<Product>> AddProduct([FromBody] ProductRequest productRequest)
+        public async Task<ActionResult<ProductDTO>> AddProduct([FromBody] ProductRequest productRequest)
         {
-            var product = new Product
+            if (productRequest == null || string.IsNullOrWhiteSpace(productRequest.Name) || productRequest.Price == null)
             {
-                Name = productRequest.Name,
-                Price = productRequest.Price
-            };
+                return BadRequest("Invalid product data.");
+            }
 
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var product = new Product
+                {
+                    Name = productRequest.Name,
+                    Price = productRequest.Price.Value
+                };
 
-            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+                _context.Products.Add(product);
+                await _context.SaveChangesAsync();
+
+                var productDTO = new ProductDTO
+                {
+                    Id = product.Id,
+                    Name = product.Name,
+                    Price = product.Price
+                };
+
+                return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, productDTO);
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while creating the product.");
+            }
         }
 
         // GET: api/Products/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(int id)
+        public async Task<ActionResult<ProductDTO>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-
-            if (product == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("Invalid ID.");
             }
 
-            return product;
+            try
+            {
+                var product = await _context.Products.FindAsync(id);
+
+                if (product == null)
+                {
+                    return NotFound();
+                }
+
+                var productDTO = new ProductDTO
+                {
+                    Id = product.Id,
+                    Name = product.Name,
+                    Price = product.Price
+                };
+
+                return productDTO;
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while retrieving the product.");
+            }
         }
 
         // GET: api/Products
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+        public async Task<ActionResult<IEnumerable<ProductDTO>>> GetProducts()
         {
-            return await _context.Products.ToListAsync();
+            try
+            {
+                var products = await _context.Products.ToListAsync();
+
+                var productDTOs = products.Select(p => new ProductDTO
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Price = p.Price
+                }).ToList();
+
+                return productDTOs;
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while retrieving the product list.");
+            }
+        }
+
+        //GET: api/Products/count
+        [HttpGet("count")]
+        public async Task<ActionResult<object>> GetProductCount()
+        {
+            try
+            {
+                var count = await _context.Products.CountAsync();
+                return Ok(new { count });
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while counting products.");
+            }
         }
 
         // PUT: api/Products/5
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, [FromBody] ProductRequest productRequest)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("Invalid ID.");
             }
 
-            product.Name = productRequest.Name;
-            product.Price = productRequest.Price;
+            if (productRequest == null || string.IsNullOrWhiteSpace(productRequest.Name) || productRequest.Price == null)
+            {
+                return BadRequest("Invalid product data.");
+            }
 
-            _context.Entry(product).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            try
+            {
+                var product = await _context.Products.FindAsync(id);
+                if (product == null)
+                {
+                    return NotFound();
+                }
 
-            return NoContent();
+                product.Name = productRequest.Name;
+                product.Price = productRequest.Price.Value;
+
+                _context.Entry(product).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while updating the product.");
+            }
         }
 
         // DELETE: api/Products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("Invalid ID.");
             }
 
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var product = await _context.Products.FindAsync(id);
+                if (product == null)
+                {
+                    return NotFound();
+                }
 
-            return NoContent();
+                _context.Products.Remove(product);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch
+            {
+                return StatusCode(500, "An error occurred while deleting the product.");
+            }
         }
     }
 
-    // Request body for adding or updating a product
     public class ProductRequest
     {
         public string Name { get; set; }
