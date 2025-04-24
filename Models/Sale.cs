@@ -8,7 +8,6 @@ public class Sale
     public int ProductId { get; set; }
     public int StoreId { get; set; }
 
-    // Navigation properties
     public virtual Customer Customer { get; set; }
     public virtual Product Product { get; set; }
     public virtual Store Store { get; set; }
